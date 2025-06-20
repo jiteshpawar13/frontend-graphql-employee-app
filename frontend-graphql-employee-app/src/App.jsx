@@ -7,39 +7,49 @@ function App() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    position: ''
+    position: '',
   });
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
   const fetchEmployees = async () => {
-    const query = `
-      query {
-        employees {
-          id
-          name
-          email
-          position
+    setLoading(true);
+    try {
+      const query = `
+        query {
+          employees {
+            id
+            name
+            email
+            position
+          }
         }
-      }
-    `;
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
-    });
-    const { data } = await res.json();
-    setEmployees(data.employees);
+      `;
+      const res = await fetch(API_URL + '/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      const { data } = await res.json();
+      setEmployees(data.employees);
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (e) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    setSubmitting(true);
     const mutation = `
       mutation CreateEmployee($input: NewEmployee!) {
         createEmployee(input: $input) {
@@ -50,17 +60,23 @@ function App() {
         }
       }
     `;
-
     const variables = { input: formData };
 
-    await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: mutation, variables })
-    });
-
-    setFormData({ name: '', email: '', position: '' });
-    fetchEmployees();
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: mutation, variables }),
+      });
+      setFormData({ name: '', email: '', position: '' });
+      setSuccessMsg('Employee added successfully!');
+      fetchEmployees();
+    } catch (err) {
+      console.error('Error creating employee:', err);
+    } finally {
+      setSubmitting(false);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }
   };
 
   useEffect(() => {
@@ -68,20 +84,20 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-center">Employee Directory</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
+      <div className="max-w-5xl mx-auto">
+        <h1 className="text-4xl font-bold text-center text-blue-800 mb-10">🚀 Employee Directory</h1>
 
         <form
           onSubmit={handleSubmit}
-          className="bg-white p-6 rounded shadow mb-8 grid gap-4 grid-cols-1 md:grid-cols-3"
+          className="bg-white shadow-md rounded-lg p-6 mb-10 grid gap-4 md:grid-cols-4"
         >
           <input
             name="name"
             value={formData.name}
             onChange={handleChange}
-            placeholder="Name"
-            className="border p-2 rounded"
+            placeholder="Full Name"
+            className="border border-gray-300 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
             required
           />
           <input
@@ -89,49 +105,59 @@ function App() {
             type="email"
             value={formData.email}
             onChange={handleChange}
-            placeholder="Email"
-            className="border p-2 rounded"
+            placeholder="Email Address"
+            className="border border-gray-300 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
             required
           />
           <input
             name="position"
             value={formData.position}
             onChange={handleChange}
-            placeholder="Position"
-            className="border p-2 rounded"
+            placeholder="Job Title"
+            className="border border-gray-300 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
             required
           />
           <button
             type="submit"
-            className="col-span-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+            disabled={submitting}
+            className="bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Add Employee
+            {submitting ? 'Adding...' : 'Add Employee'}
           </button>
         </form>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white rounded shadow">
-            <thead className="bg-gray-200 text-left">
+        {successMsg && (
+          <div className="mb-6 text-green-700 bg-green-100 border border-green-200 px-4 py-2 rounded shadow">
+            ✅ {successMsg}
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
+          <table className="min-w-full table-auto">
+            <thead className="bg-blue-100 text-blue-800 text-sm font-semibold">
               <tr>
-                <th className="p-3">Name</th>
-                <th className="p-3">Email</th>
-                <th className="p-3">Position</th>
+                <th className="px-6 py-4 text-left">Name</th>
+                <th className="px-6 py-4 text-left">Email</th>
+                <th className="px-6 py-4 text-left">Position</th>
               </tr>
             </thead>
             <tbody>
-              {employees.map((emp) => (
-                <tr key={emp.id} className="border-t">
-                  <td className="p-3">{emp.name}</td>
-                  <td className="p-3">{emp.email}</td>
-                  <td className="p-3">{emp.position}</td>
-                </tr>
-              ))}
-              {employees.length === 0 && (
+              {loading ? (
                 <tr>
-                  <td colSpan="3" className="text-center p-4 text-gray-500">
-                    No employees found.
-                  </td>
+                  <td colSpan="3" className="text-center py-6 text-gray-500">Loading employees...</td>
                 </tr>
+              ) : employees.length === 0 ? (
+                <tr>
+                  <td colSpan="3" className="text-center py-6 text-gray-500">No employees found.</td>
+                </tr>
+              ) : (
+                employees.map((emp) => (
+                  <tr key={emp.id} className="border-t text-gray-700 hover:bg-gray-50 transition">
+                    <td className="px-6 py-4">{emp.name}</td>
+                    <td className="px-6 py-4">{emp.email}</td>
+                    <td className="px-6 py-4">{emp.position}</td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
